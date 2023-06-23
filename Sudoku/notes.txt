@@ -1,0 +1,8 @@
+﻿pentru statistics
+
+totul e scris in json
+json e transformat in bytes
+bytes => xor bytes
+se modifica ordinea la bytes: pentru x:1..(n/2) (step +2)       swap(a[x],a[-1 - x])
+se imparte bytes in chunk uri de 64 bytes
+inainte de fiecare chunk, se pune sha256 de la acel chunk dupa ce se face xor pe acel sha256

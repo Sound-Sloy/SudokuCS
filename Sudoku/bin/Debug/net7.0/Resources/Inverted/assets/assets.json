@@ -1,0 +1,14 @@
+{
+    "positions": {
+        "board": "30:30",
+        "hearts": "600:50"
+    },
+    "paddings": {
+        "cell_padding": "0:0",
+        "group_padding": "4:4",
+        "heart_padding": "10"
+    },
+    "alignments": {
+        "hearts": "top_to_bottom"
+    }
+}
