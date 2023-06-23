@@ -30,9 +30,9 @@ namespace Sudoku.src
                 Raylib.ClearBackground(Color.WHITE);
                 //b.Draw();
                 //tb.Draw();
-                //board.Draw();
-                textb.Update();
-                textb.Draw();
+                board.Draw();
+                //textb.Update();
+                //textb.Draw();
 
                 Raylib.EndDrawing();
             }
