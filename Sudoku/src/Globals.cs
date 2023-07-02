@@ -12,4 +12,5 @@ public static class Globals
     public static Resources.ResourcePack ResPack = ResourceLoader.Get;
     public static SudokuLib SudokuGenerator = new SudokuLib();
     public static TileStyle TileStyle = new TileStyle();
+    public static Font MainMenuFont;
 }

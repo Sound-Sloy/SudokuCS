@@ -28,31 +28,35 @@ public struct TileStyle
 
 public class Tile
 {
-    private Vector2 m_Pos;
-    private Vector2 m_Size;
-    private bool m_Focused = false;
-    private bool m_TextLock = false;
-    private string m_Text;
-    private uint m_ID = 0;
-    private bool m_bIsMistake = false;
+    private TextObject m_TextObject;
+    
+    public Vector2 Pos { get; set; }
+    public Vector2 Size { get; set; }
+    public bool Focus { get; set; } = false;
+    public string Text { get; set; } = "";
+    public uint ID { get; private set; } = 0;
+    public bool TextLock { get; set; } = false;
+    public BetterRenderTexture Parent { get; init; }
+    //public Guid GUID { get; init; }
 
-    public Tile(Vector2 pos, string text = "", uint id = 0)
+    public Vector2 MousePos => Parent.MousePos;
+    public bool Mistake => Text != Globals.SudokuGenerator.SolvedBoard1D[ID].ToString() && Text != "";
+
+    public Tile(Vector2 pos, ref BetterRenderTexture parent, string text = "", uint id = 0)
     {
-        m_Pos = pos;
-        m_Size = new Vector2(Globals.ResPack.Textures["cell_normal.png"].width, Globals.ResPack.Textures["cell_normal.png"].height);
-        m_Text = text;
-        m_ID = id;
+        Pos = pos;
+        Parent = parent;
+        Size = new Vector2(Globals.ResPack.Textures["cell_normal.png"].width, Globals.ResPack.Textures["cell_normal.png"].height);
+        Text = text;
+        ID = id;
+        m_TextObject = new TextObject(text, Globals.TileStyle.Font, (int)Globals.TileStyle.TextSize, 1f, Globals.TileStyle.TextColor);
     }
 
     public void Draw()
     {
-        if (m_Text != Globals.SudokuGenerator.SolvedBoard1D[ID].ToString()) 
+        if(m_TextObject.Text != Text)
         {
-            m_bIsMistake = true;
-        }
-        else
-        {
-            m_bIsMistake = false;
+            m_TextObject.Text = Text;
         }
 
         if (IsClicked) 
@@ -66,66 +70,25 @@ public class Tile
         }
 
         Texture2D texture = Focus ? Globals.ResPack.Textures["cell_focused.png"] : Globals.ResPack.Textures["cell_normal.png"];
-        Color color = Text == "" ? Globals.TileStyle.TextColor : ( int.Parse(Text) == Globals.SudokuGenerator.SolvedBoard1D[ID] ? Globals.TileStyle.TextColor : Globals.TileStyle.TextErrorColor );
-        TextObject textObject = new(m_Text, Globals.TileStyle.Font, (int)Globals.TileStyle.TextSize, 1f, color);
+        Color color = Mistake ? Globals.TileStyle.TextErrorColor : Globals.TileStyle.TextColor;
+        m_TextObject.Color = color;
 
-        Raylib.DrawTextureV(texture, m_Pos, Color.WHITE);
+        Raylib.DrawTextureV(texture, Pos, Color.WHITE);
         if (IsHovered)
         {
-            Raylib.DrawTextureV(Globals.ResPack.Textures["cell_focused.png"], m_Pos, new Color(255, 255, 255, (int)Globals.TileStyle.HoverEffectAlpha));
+            Raylib.DrawTextureV(Globals.ResPack.Textures["cell_focused.png"], Pos, new Color(255, 255, 255, (int)Globals.TileStyle.HoverEffectAlpha));
         }
-        textObject.Draw(new Vector2(m_Pos.X + (m_Size.X - textObject.Measurements.X) / 2, m_Pos.Y + (m_Size.Y - textObject.Measurements.Y) / 2));
+        m_TextObject.Draw(new Vector2(Pos.X + (Size.X - m_TextObject.Measurements.X) / 2, Pos.Y + (Size.Y - m_TextObject.Measurements.Y) / 2));
     }
 
     public void DrawSelectionMarker()
     {
-        Raylib.DrawTextureV(Globals.ResPack.Textures["selection.png"], m_Pos, Color.WHITE);
+        Raylib.DrawTextureV(Globals.ResPack.Textures["selection.png"], Pos, Color.WHITE);
     }
 
-    public Vector2 Pos
-    {
-        get => m_Pos;
-        set => m_Pos = value;
-    }
+    public bool IsHovered => Raylib.CheckCollisionPointRec(MousePos, new Rectangle(Pos.X, Pos.Y, Size.X, Size.Y));
 
-    public Vector2 Size
-    {
-        get => m_Size;
-        set => m_Size = value;
-    }
+    public bool IsClicked => IsHovered && Mouse.IsMouseButtonPressed(MouseButton.MOUSE_BUTTON_LEFT);
 
-    public bool Focus
-    {
-        get => m_Focused;
-        set => m_Focused = value;
-    }
-
-    public string Text
-    {
-        get => m_Text;
-        set => m_Text = value;
-    }
-
-    public uint ID
-    {
-        get => m_ID;
-        set => m_ID = value;
-    }
-
-    public bool TextLock
-    {
-        get => m_TextLock;
-        set => m_TextLock = value;
-    }
-
-    public bool Mistake
-    {
-        get => m_bIsMistake;
-    }
-
-    public bool IsHovered => Raylib.CheckCollisionPointRec(Raylib.GetMousePosition(), new Rectangle(m_Pos.X, m_Pos.Y, m_Size.X, m_Size.Y));
-
-    public bool IsClicked => IsHovered && Raylib.IsMouseButtonPressed(MouseButton.MOUSE_BUTTON_LEFT);
-
-    private bool IsClickedOutsideRect => !IsHovered && Raylib.IsMouseButtonPressed(MouseButton.MOUSE_BUTTON_LEFT);
+    private bool IsClickedOutsideRect => !IsHovered && Mouse.IsMouseButtonPressed(MouseButton.MOUSE_BUTTON_LEFT);
 }

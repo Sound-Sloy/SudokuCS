@@ -205,9 +205,10 @@ public class SudokuLib
     public int[] Board1D => m_Board.Cast<int>().ToArray();
     public int[] SolvedBoard1D => m_SolvedBoard.Cast<int>().ToArray();
 
-    public void Generate(int difficulty = 1)
+    public void Generate(int difficulty = 0)
     {
         // Clear the board
+        
         ResetBoard();
 
         Random RNG = new();
@@ -240,7 +241,11 @@ public class SudokuLib
         // Remove cells based on difficulty level
         Random random = new Random();
 
-        int cellsToRemove = difficulty * 10;
+
+        var a = (float x) => { return 0.38 * (x + 0.2) * (x + 0.2) + 0.15; };
+        int cellsToRemove = (int)(81 * a(.1f + difficulty * .2f));
+
+        cellsToRemove += random.Next(4)-1;
 
         while (cellsToRemove > 0)
         {

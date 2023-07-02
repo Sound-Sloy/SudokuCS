@@ -22,24 +22,37 @@ public class Board : IDisposable
     private int m_MaxLives = 5;
     private int m_Lives;
 
+    private BetterRenderTexture m_Canvas;
+
     private TextureButton m_SaveButton;
+    private SaveChildWindow m_SaveWindow;
+
+    private bool m_bScreenshotLoaded = false;
+    private Image m_Screenshot;
+    private Texture2D m_ScreenshotTexture;
 
 
     public Board(int maxLives = 5)
     {
+        m_Canvas = new BetterRenderTexture(Raylib.GetRenderWidth(), Raylib.GetRenderHeight(), null, Content);
+
         m_MaxLives = maxLives;
         for(uint i = 0; i < 81; i++)
         {
-            m_Tiles.Add(new Tile(new Vector2(),
-                Globals.SudokuGenerator.Board1D[i] == 0 ? "" : Globals.SudokuGenerator.Board1D[i].ToString(),
-                i));
-            m_Tiles.Last().Pos = new Vector2(m_Tiles.Last().ID % 9 * m_Tiles.Last().Size.X + m_Tiles.Last().ID % 9 * m_OffsetTile.X + m_Tiles.Last().ID % 9 / 3 * m_OffsetTileGroup.X + m_Offset.X,
+            string tileText = Globals.SudokuGenerator.Board1D[i] == 0 ? "" : Globals.SudokuGenerator.Board1D[i].ToString();
+
+
+            m_Tiles.Add(new Tile(new Vector2(), ref m_Canvas, tileText, i));
+            var tilePos = new Vector2(m_Tiles.Last().ID % 9 * m_Tiles.Last().Size.X + m_Tiles.Last().ID % 9 * m_OffsetTile.X + m_Tiles.Last().ID % 9 / 3 * m_OffsetTileGroup.X + m_Offset.X,
                     m_Tiles.Last().ID / 9 * m_Tiles.Last().Size.Y + m_Tiles.Last().ID / 9 * m_OffsetTile.Y + m_Tiles.Last().ID / 9 / 3 * m_OffsetTileGroup.Y + m_Offset.Y);
-            m_Tiles.Last().TextLock = m_Tiles.Last().Text == "" ? false : true;
+            m_Tiles.Last().Pos = tilePos;
+            m_Tiles.Last().TextLock = m_Tiles.Last().Text != "";
         }
 
 
-        m_SaveButton = new TextureButton(Globals.ResPack.Textures["save_icon.png"], new Vector2(m_Tiles.Last().Pos.X + m_Tiles.Last().Size.X + m_OffsetTileGroup.X, m_Tiles.Last().Pos.Y + (m_Tiles.Last().Size.Y - Globals.ResPack.Textures["save_icon.png"].height) / 2));
+        m_SaveButton = new TextureButton(ref m_Canvas, Globals.ResPack.Textures["save_icon.png"], new Vector2(m_Tiles.Last().Pos.X + m_Tiles.Last().Size.X + m_OffsetTileGroup.X, m_Tiles.Last().Pos.Y + (m_Tiles.Last().Size.Y - Globals.ResPack.Textures["save_icon.png"].height) / 2));
+        m_SaveButton.OnClick += SpawnSaveWindow;
+
 
         m_Lives = m_MaxLives;
 
@@ -47,6 +60,9 @@ public class Board : IDisposable
         m_SaveFile.Contents.MaxLives = m_MaxLives;
 
         m_SaveFile.AddFrame(new SaveFrame() { BoardValues = GetValues(), Lives = m_MaxLives });
+
+        m_SaveWindow = new SaveChildWindow(ref m_Canvas, ref m_SaveFile, "Save Board");
+        m_SaveWindow.Show = false;
     }
 
     ~Board()
@@ -130,10 +146,11 @@ public class Board : IDisposable
             char pressedChar = (char)Raylib.GetCharPressed();
             if (new List<char> { '0', '1', '2', '3', '4', '5', '6', '7', '8', '9' }.Contains(pressedChar) && m_ClickedTileID != -1 && !@m_Tiles[m_ClickedTileID].TextLock)
             {
+                bool valueChanged = m_Tiles[m_ClickedTileID].Text != pressedChar.ToString();
                 m_Tiles[m_ClickedTileID].Text = pressedChar.ToString();
                 m_SelectedTileValue = pressedChar.ToString();
 
-                if (m_Tiles[m_ClickedTileID].Mistake)
+                if (m_Tiles[m_ClickedTileID].Mistake && valueChanged)
                 {
                     m_Lives = m_Lives > 0 ? m_Lives - 1 : 0;
                 }
@@ -145,6 +162,11 @@ public class Board : IDisposable
                 });
 
                 m_ClickedTileID = -1;
+
+                DbgShowLives();
+                DbgShowSolvedBoard();
+                DbgShowInitialBoard();
+                DbgShowMTilesVals();
             }
         }
         if (m_bIsComplete && !m_bHasBeenSaved)
@@ -154,13 +176,88 @@ public class Board : IDisposable
         }
     }
 
-    public void Draw()
+    private void Content()
     {
-        DrawHearts();
-        DrawTiles();
-        m_SaveButton.Draw();
+        if (m_SaveWindow.Show)
+        {
+            if (!m_bScreenshotLoaded)
+            {
+                m_Screenshot = Raylib.LoadImageFromScreen();
+                m_ScreenshotTexture = Raylib.LoadTextureFromImage(m_Screenshot);
+
+                m_bScreenshotLoaded = true;
+            }
+
+            //Raylib.DrawTexture(m_ScreenshotTexture, 0, 0, Color.WHITE);
+            
+            Raylib.DrawText("as", 0, 0, 20, Color.RED);
+            m_SaveWindow.Draw();
+
+            
+        }
+        else
+        {
+            if (m_ScreenshotTexture.width != 0 && m_bScreenshotLoaded)
+            {
+                Raylib.UnloadImage(m_Screenshot);
+                Raylib.UnloadTexture(m_ScreenshotTexture);
+                m_bScreenshotLoaded = false;
+            }
+
+            DrawHearts();
+            DrawTiles();
+            m_SaveButton.Draw();
+        }
+
     }
 
+    public void Draw()
+    {
+        m_Canvas.Draw(new Vector2(0,0));
+    }
+
+
+    private void DbgShowLives()
+    {
+        Console.WriteLine("DbgShowLives");
+        Console.WriteLine($"{m_Lives}/{m_MaxLives}");
+    }
+
+    private void DbgShowSolvedBoard()
+    {
+        Console.WriteLine("DbgShowSolvedBoard");
+        for (int i = 0; i < Globals.SudokuGenerator.SolvedBoard1D.Count(); i++) 
+        {
+            Console.Write($"[{i}] {Globals.SudokuGenerator.SolvedBoard1D[i]}   ");
+        }
+        Console.WriteLine();
+    }
+
+    private void DbgShowMTilesVals()
+    {
+        Console.WriteLine("DbgShowMTilesVals");
+        foreach (var tile in m_Tiles)
+        {
+            Console.Write($"[{tile.ID}] {tile.Text}   ");
+        }
+        Console.WriteLine();
+    }
+
+    private void DbgShowInitialBoard()
+    {
+        Console.WriteLine("DbgShowInitialBoard");
+        for (int i = 0; i < Globals.SudokuGenerator.Board1D.Count(); i++)
+        {
+            Console.Write($"[{i}] {Globals.SudokuGenerator.Board1D[i]}   ");
+        }
+        Console.WriteLine();
+    }
+
+    private void SpawnSaveWindow()
+    {
+        m_SaveWindow.Dispose();
+        m_SaveWindow = new SaveChildWindow(ref m_Canvas, ref m_SaveFile, "Save Board");
+    }
 
 
     private bool m_bDisposed = false;
@@ -188,6 +285,80 @@ public class Board : IDisposable
 
             // Note disposing has been done.
             m_bDisposed = true;
+        }
+    }
+
+
+    private class SaveChildWindow : IDisposable
+    {
+        public string Name { get; init; }
+        public BetterRenderTexture Parent { get; init; }
+        private BetterRenderTexture m_Canvas;
+        public SaveFile SaveFile { get; init; }
+
+        private TextObject WindowTitle { get; set; }
+        private Textbox FileNameTextbox { get; set; }
+
+        public bool IsHovered => Raylib.CheckCollisionPointRec(m_Canvas.MousePos, new Rectangle(0, 0, m_Canvas.Size.X, m_Canvas.Size.Y));
+        public bool IsClicked => IsHovered && Mouse.IsMouseButtonPressed(MouseButton.MOUSE_BUTTON_LEFT);
+        public bool IsClickedOutside => !IsHovered && Mouse.IsMouseButtonPressed(MouseButton.MOUSE_BUTTON_LEFT);
+
+        public bool Show { get; set; } = true;
+
+        public SaveChildWindow(ref BetterRenderTexture parent, ref SaveFile saveFile, string name)
+        {
+            Parent = parent;
+            Name = name;
+            SaveFile = saveFile;
+            m_Canvas = new BetterRenderTexture(300, 300, parent.GUID, Content);
+
+            WindowTitle = new TextObject("Save Board", Globals.MainMenuFont, 20, 1f, Color.RED);
+            FileNameTextbox = new Textbox(ref m_Canvas, 200, 30, new Textbox.Configuration { Font = Globals.MainMenuFont, OutlineRoundness = 1f });
+        }
+
+        private void Content()
+        {
+            Raylib.ClearBackground(Color.BLUE);
+            WindowTitle.Draw(5, 5);
+            FileNameTextbox.Draw(new Vector2(60,30));
+            //if (IsClickedOutside) { Show = false; }
+        }
+
+        public void Draw()
+        {
+            //m_Canvas.Draw((int)(Raylib.GetRenderWidth() - m_Canvas.Size.X) / 2, (int)(Raylib.GetRenderHeight() - m_Canvas.Size.Y) / 2);
+            m_Canvas.Draw(100,100);
+
+        }
+
+
+
+        private bool m_bDisposed = false;
+
+        public void Dispose()
+        {
+            Dispose(disposing: true);
+
+            GC.Collect();
+            GC.SuppressFinalize(this);
+        }
+
+        protected virtual void Dispose(bool disposing)
+        {
+            // Check to see if Dispose has already been called.
+            if (!m_bDisposed)
+            {
+                if (disposing)
+                {
+                    // Dispose managed resources.
+
+                }
+
+                //Raylib.UnloadRenderTexture(m_Canvas);
+
+                // Note disposing has been done.
+                m_bDisposed = true;
+            }
         }
     }
 }

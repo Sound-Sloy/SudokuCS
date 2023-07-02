@@ -17,20 +17,38 @@ namespace Sudoku.src
 
             Globals.SudokuGenerator.Generate();
 
-            var b = new Button("dsf", 10, 10, 100, 100);
-            var tb = new TextureButton(Globals.ResPack.Textures["cell_normal.png"], 100, 100, 0, 0);
+            Globals.MainMenuFont = Raylib.LoadFont(Globals.ResPack.Fonts["ubuntu-regular.ttf"]);
+
+            MainMenu mainMenu = new();
 
             Board board = new();
 
-            Textbox textb = new(new Vector2(100, 100), new Vector2(250, 30));
+            bool gameInProgress = false;
 
             while (!Raylib.WindowShouldClose())
             {
                 Raylib.BeginDrawing();
                 Raylib.ClearBackground(Color.WHITE);
-                //b.Draw();
-                //tb.Draw();
-                board.Draw();
+
+                if (!gameInProgress)
+                {
+                    mainMenu.Draw();
+                }
+
+                if (mainMenu.ShouldStartGame && !gameInProgress)
+                {
+                    gameInProgress = true;
+                    board.Dispose();
+                    Globals.SudokuGenerator.Generate((int)mainMenu.SelectedDifficulty);
+                    board = new Board();
+                }
+                
+                if(gameInProgress)
+                {
+                    board.Draw();
+                }
+
+                //board.Draw();
                 //textb.Update();
                 //textb.Draw();
 

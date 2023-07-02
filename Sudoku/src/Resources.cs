@@ -65,6 +65,11 @@ namespace Resources
                 }
             }
             m_RecentlyLoaded = true;
+
+            foreach(var font in m_Resources.Fonts)
+            {
+                Console.WriteLine($"{font.Key}, {font.Value}");
+            }
         }
 
         //public ResourcePack Get => ResourcePack;

@@ -13,43 +13,19 @@ public class Textbox
 {
     private class Glyph
     {
-        private string m_Symbol;
-        private float m_FontSize;
-        private bool m_bIsSelected;
-        private Font m_Font = Raylib.GetFontDefault();
+        public string Symbol { get; set; }
+        public float FontSize { get; set; }
+        public bool Selected { get; set; }
+        public Font Font { get; set; } = Raylib.GetFontDefault();
+
+        public Vector2 Size => Raylib.MeasureTextEx(Font, Symbol, FontSize, 1f);
 
         public Glyph(string symbol, Font font, float size, bool isSelected = false)
         {
-            m_Symbol = symbol;
-            m_FontSize = size;
-            m_bIsSelected = isSelected;
-            m_Font = font;
-        }
-
-        public Vector2 Size => Raylib.MeasureTextEx(m_Font, m_Symbol, m_FontSize, 1f);
-
-        public string Symbol
-        {
-            get => m_Symbol;
-            set => m_Symbol = value;
-        }
-
-        public float FontSize
-        {
-            get => m_FontSize;
-            set => m_FontSize = value;
-        }
-        
-        public bool Selected
-        {
-            get => m_bIsSelected;
-            set => m_bIsSelected = value;
-        }
-
-        public Font Font
-        {
-            get => m_Font;
-            set => m_Font = value;
+            Symbol = symbol;
+            FontSize = size;
+            Selected = isSelected;
+            Font = font;
         }
     }
 
@@ -85,14 +61,14 @@ public class Textbox
         }
     }
 
-    private Vector2 m_Pos;
+    public Vector2 Pos { get; private set; }
     private int m_TextPos = 0;
-    private Vector2 m_Size;
+    public Vector2 Size { get; private set; }
     private List<Glyph> m_Glyphs = new();
     private int m_CursorPos = 0;
-    private RenderTexture2D m_Canvas;
-    private bool m_IsFocused = false;
-    private Configuration m_Properties;
+    private BetterRenderTexture m_Canvas;
+    private BetterRenderTexture Parent { get; }
+    public Configuration Properties { get; set; }
     private Vector2 m_Offset = new Vector2(2, 2);
 
     private bool m_KeyShouldRepeat = false;
@@ -102,45 +78,49 @@ public class Textbox
     private bool m_bShouldDrawCursor = false;
     private float m_CursorBlinkTimer = 0f;
 
-    public Configuration Properties
-    {
-        get => m_Properties;
-        set => m_Properties = value;
-    }
+    public bool Focus { get; private set; } = false;
 
-    public Vector2 Pos
-    {
-        get => m_Pos;
-        set => m_Pos = value;
-    }
+    //private Vector2 MousePos => Parent.MousePos;
 
-    public bool Focus => m_IsFocused;
+    private bool IsHovered => Raylib.CheckCollisionPointRec(m_Canvas.MousePos, new Rectangle(0, 0, Size.X, Size.Y));
+    private bool IsClicked => IsHovered && Mouse.IsMouseButtonPressed(MouseButton.MOUSE_BUTTON_LEFT);
+    private bool IsClickedOutside => !IsHovered && Mouse.IsMouseButtonPressed(MouseButton.MOUSE_BUTTON_LEFT);
 
-    private bool IsHovered => Raylib.CheckCollisionPointRec(Raylib.GetMousePosition(), new Rectangle(m_Pos.X, m_Pos.Y, m_Size.X, m_Size.Y));
-    private bool IsClicked => IsHovered && Raylib.IsMouseButtonPressed(MouseButton.MOUSE_BUTTON_LEFT);
-    private bool IsClickedOutside => !IsHovered && Raylib.IsMouseButtonPressed(MouseButton.MOUSE_BUTTON_LEFT);
-
-    public string Text => GetText();
-
-    public Textbox(Vector2 pos, Vector2 size, Configuration? properties = null)
-    {
-        m_Pos = pos;
-        m_Size = size;
-        if(properties != null)
-        {
-            m_Properties = properties;
+    public string Text{
+        get {
+            string text = "";
+            foreach (var glyph in m_Glyphs)
+            {
+                text += glyph.Symbol;
+            }
+            return text;
         }
-        else
-        {
-            m_Properties = new Configuration();
-        }
-
-        m_TextPos = m_Properties.OutlineWidth + (int)m_Offset.X;
-        m_Canvas = Raylib.LoadRenderTexture((int)size.X, (int)size.Y);
     }
 
-    public Textbox(int posX, int posY, int sizeX, int sizeY, Configuration? properties = null) 
-        : this(new Vector2(posX, posY), new Vector2(sizeX, sizeY), properties)
+    /*
+     private string GetText()
+    {
+        string text = "";
+        foreach (var glyph in m_Glyphs)
+        {
+            text+=glyph.Symbol;
+        }
+        return text;
+    }
+     */
+
+    public Textbox(ref BetterRenderTexture parent, Vector2 size, Configuration? properties = null)
+    {
+        m_Canvas = new BetterRenderTexture((int)size.X, (int)size.Y, parent.GUID, Content);
+        Parent = parent;
+        Size = size;
+        Properties = properties != null ? properties : new Configuration();
+
+        m_TextPos = Properties.OutlineWidth + (int)m_Offset.X;
+    }
+
+    public Textbox(ref BetterRenderTexture parent, int sizeX, int sizeY, Configuration? properties = null) 
+        : this(ref parent, new Vector2(sizeX, sizeY), properties)
     {
 
     }
@@ -179,7 +159,7 @@ public class Textbox
 
     private void HandleEnter()
     {
-        m_IsFocused = false;
+        Focus = false;
     }
 
     private void HandleLeft()
@@ -202,13 +182,13 @@ public class Textbox
     {
         if (IsClicked)
         {
-            m_IsFocused = !m_IsFocused;
+            Focus = !Focus;
         }
-        if (m_IsFocused)
+        if (Focus)
         {
             if (Keyboard.GetKeyPressed() == KeyboardKey.KEY_ESCAPE || IsClickedOutside)
             {
-                m_IsFocused = false;
+                Focus = false;
             }
         }
 
@@ -218,7 +198,7 @@ public class Textbox
             m_Glyphs[i].FontSize = Properties.FontSize;
         }
 
-        if(!m_IsFocused)
+        if(!Focus)
         {
             return;
         }
@@ -236,15 +216,9 @@ public class Textbox
         //                                                              Handle Special Keys 
 
 
-        int pressedKey = Raylib.GetKeyPressed();
+        KeyboardKey pressedKey = Keyboard.GetKeyPressed();
 
-        /*if (Raylib.IsKeyDown((KeyboardKey)pressedKey))
-        {
-            Console.WriteLine(Raylib.GetKeyPressed().ToString() + " " + Raylib.GetTime().ToString() + "LEFT");
-        }*/
-
-
-        switch ((KeyboardKey)pressedKey)
+        switch (pressedKey)
         {
             case KeyboardKey.KEY_ENTER or KeyboardKey.KEY_KP_ENTER:
                 HandleEnter();
@@ -308,35 +282,26 @@ public class Textbox
 
         if (m_Glyphs.Any())
         {
-            if (m_TextPos + MeasureText(GetText().Substring(0, m_CursorPos)).X < Properties.OutlineWidth + m_Offset.X + m_Glyphs[m_CursorPos > 0 ? m_CursorPos - 1 : 0].Size.X)
+            if (m_TextPos + MeasureText(Text.Substring(0, m_CursorPos)).X < Properties.OutlineWidth + m_Offset.X + m_Glyphs[m_CursorPos > 0 ? m_CursorPos - 1 : 0].Size.X)
             {
-                int a = (int)MeasureText(GetText().Substring(0, m_CursorPos > 0 ? m_CursorPos : 0)).X + m_TextPos;
+                int a = (int)MeasureText(Text.Substring(0, m_CursorPos > 0 ? m_CursorPos : 0)).X + m_TextPos;
                 m_TextPos += (int)m_Glyphs[m_CursorPos > 0 ? m_CursorPos - 1 : 0].Size.X - a;
             }
-            else if (m_TextPos + MeasureText(GetText().Substring(0, m_CursorPos)).X > m_Size.X - Properties.OutlineWidth - m_Offset.X - m_Glyphs[m_CursorPos > 0 ? m_CursorPos - 1 : 0].Size.X) 
+            else if (m_TextPos + MeasureText(Text.Substring(0, m_CursorPos)).X > Size.X - Properties.OutlineWidth - m_Offset.X - m_Glyphs[m_CursorPos > 0 ? m_CursorPos - 1 : 0].Size.X) 
             {
-                int a = (int)MeasureText(GetText().Substring(0, m_CursorPos > 0 ? m_CursorPos : 0)).X - Math.Abs(m_TextPos) - (int)m_Size.X;
+                int a = (int)MeasureText(Text.Substring(0, m_CursorPos > 0 ? m_CursorPos : 0)).X - Math.Abs(m_TextPos) - (int)Size.X;
                 m_TextPos -= a + Properties.OutlineWidth + (int)m_Offset.X;
             }
         }
-        if(m_TextPos > Properties.OutlineWidth + m_Offset.X)
+        if (m_TextPos > Properties.OutlineWidth + m_Offset.X)
         {
             m_TextPos = Properties.OutlineWidth + (int)m_Offset.X;
         }
 
     }
 
-    private string GetText()
-    {
-        string text = "";
-        foreach (var glyph in m_Glyphs)
-        {
-            text+=glyph.Symbol;
-        }
-        return text;
-    }
 
-    private Vector2 TextMeasurements => Raylib.MeasureTextEx(Properties.Font, GetText(), Properties.FontSize, Properties.FontSpacing);
+    private Vector2 TextMeasurements => Raylib.MeasureTextEx(Properties.Font, Text, Properties.FontSize, Properties.FontSpacing);
 
     private Vector2 MeasureText(string text)
     {
@@ -345,7 +310,7 @@ public class Textbox
 
     private void DrawCursor()
     {
-        if (!m_IsFocused)
+        if (!Focus)
         {
             return;
         }
@@ -358,34 +323,45 @@ public class Textbox
 
         if (m_bShouldDrawCursor)
         {
-            Raylib.DrawRectangleV(new Vector2(m_TextPos + (int)MeasureText(GetText().Substring(0, m_CursorPos > 0 ? m_CursorPos : 0)).X, (m_Size.Y - Properties.FontSize) / 2), new Vector2(2, Properties.FontSize), Properties.CursorColor);
+            Raylib.DrawRectangleV(new Vector2(m_TextPos + (int)MeasureText(Text.Substring(0, m_CursorPos > 0 ? m_CursorPos : 0)).X, (Size.Y - Properties.FontSize) / 2), new Vector2(2, Properties.FontSize), Properties.CursorColor);
         }
     }
 
-    public void Draw()
+    private void Content()
     {
-        Raylib.BeginTextureMode(m_Canvas);
+        Raylib.ClearBackground(Color.DARKPURPLE);
+        Raylib.DrawRectangleRounded(new Rectangle(0, 0, Size.X, Size.Y), Properties.OutlineRoundness, 0, Properties.BackgroundColor);
+        Raylib.DrawRectangleRoundedLines(new Rectangle(Properties.OutlineWidth, Properties.OutlineWidth, Size.X - 2 * Properties.OutlineWidth, Size.Y - 2 * Properties.OutlineWidth), Properties.OutlineRoundness, 10, Properties.OutlineWidth, Properties.OutlineColor);
 
-        //Raylib.ClearBackground(Color.BLACK);
-        //Console.WriteLine("here");
-        Raylib.DrawRectangleRounded(new Rectangle(0, 0, m_Size.X, m_Size.Y), Properties.OutlineRoundness, 0, Properties.BackgroundColor);
-        Raylib.DrawRectangleRoundedLines(new Rectangle(Properties.OutlineWidth, Properties.OutlineWidth, m_Size.X - 2 * Properties.OutlineWidth, m_Size.Y - 2 * Properties.OutlineWidth), Properties.OutlineRoundness, 10, Properties.OutlineWidth, Properties.OutlineColor);
-
-        Raylib.DrawTextEx(Properties.Font, GetText(), new Vector2(m_TextPos, (m_Size.Y - Properties.FontSize) / 2), Properties.FontSize, Properties.FontSpacing, Properties.TextColor);
+        Raylib.DrawTextEx(Properties.Font, Text, new Vector2(m_TextPos, (Size.Y - Properties.FontSize) / 2), Properties.FontSize, Properties.FontSpacing, Properties.TextColor);
 
         DrawCursor();
-        
-        Raylib.EndTextureMode();
+        TextObject textObject = new("helo", Raylib.GetFontDefault(), 20, 1, Color.SKYBLUE);
+        textObject.Draw(0, 0);
+    }
 
-        
-        Raylib.DrawTexturePro(m_Canvas.texture, new Rectangle(0, 0, m_Size.X, -m_Size.Y), new Rectangle(m_Pos.X, m_Pos.Y, m_Size.X, m_Size.Y), new Vector2(0, 0), 0f, Color.WHITE);
+    public void Draw(Vector2 pos)
+    {
+        if(pos != Pos)
+        {
+            Pos = pos;
+        }
+        m_Canvas.Draw(pos);
+        if (IsHovered)
+        {
+            Console.WriteLine($"hovered >> {Raylib.GetTime()}");
+        }
 
     }
 
-    public void UpdateAndDraw()
+    public void UpdateAndDraw(Vector2 pos)
     {
+        if (pos != Pos)
+        {
+            Pos = pos;
+        }
         Update();
-        Draw();
+        Draw(pos);
     }
 
     
